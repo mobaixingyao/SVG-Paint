@@ -1,0 +1,236 @@
+.panel {
+    width: 100%;
+    padding: 14px 18px 18px;
+    background: #ffffff;
+    border: 1px solid #d9d9d9;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #222;
+    box-sizing: border-box;
+}
+
+.section {
+    margin-bottom: 6px;
+}
+
+.section-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: #333;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.section-tag {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 11px;
+    color: #8c8c8c;
+    font-weight: 400;
+}
+
+.divider {
+    border-top: 1px solid #ececec;
+    margin: 10px 0;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 32px;
+    flex-wrap: wrap;
+}
+
+.label {
+    min-width: 72px;
+    color: #666;
+    flex-shrink: 0;
+}
+
+.value {
+    font-variant-numeric: tabular-nums;
+}
+
+.valueHighlight {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: rgb(58, 101, 194);
+}
+
+.hint {
+    color: #999;
+    font-size: 12px;
+}
+
+.modeSwitch {
+    display: inline-flex;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.modeOn,
+.modeOff {
+    border: 0;
+    background: #fff;
+    padding: 4px 12px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.modeOn {
+    background: rgb(58, 101, 194);
+    color: #fff;
+}
+
+.modeOff {
+    color: #444;
+}
+
+.presets {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.preset,
+.presetOn {
+    border: 1px solid #ccc;
+    background: #fff;
+    border-radius: 6px;
+    padding: 4px 14px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.presetOn {
+    background: rgb(58, 101, 194);
+    border-color: rgb(58, 101, 194);
+    color: #fff;
+}
+
+.input {
+    width: 110px;
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.times {
+    color: #888;
+}
+
+.lock {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #555;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.select {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #fff;
+}
+
+.actions {
+    display: inline-flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.button {
+    border: 0;
+    background: rgb(58, 101, 194);
+    color: #fff;
+    border-radius: 6px;
+    padding: 6px 16px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.button:disabled {
+    background: #b9c4d8;
+    cursor: not-allowed;
+}
+
+.error {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: #fdecec;
+    border: 1px solid #f2b8b8;
+    color: #b3261e;
+    border-radius: 6px;
+}
+
+.previewBox {
+    margin-top: 14px;
+    border: 1px dashed #ccc;
+    border-radius: 8px;
+    padding: 12px;
+    background: #fafafa;
+}
+
+.previewHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: #444;
+    margin-bottom: 10px;
+    font-variant-numeric: tabular-nums;
+    flex-wrap: wrap;
+}
+
+.downloadAgain {
+    border: 1px solid rgb(58, 101, 194);
+    color: rgb(58, 101, 194);
+    background: #fff;
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.preview {
+    display: block;
+    max-width: 100%;
+    max-height: 320px;
+    border: 1px solid #e0e0e0;
+    background: repeating-conic-gradient(#f0f0f0 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
+}
+
+.previewHint {
+    margin-top: 8px;
+    color: #999;
+    font-size: 12px;
+}
+
+/* 主按钮（导入 SVG 等强调入口） */
+.buttonPrimary {
+    border: 1px solid rgb(58, 101, 194);
+    background: #ffffff;
+    color: rgb(58, 101, 194);
+    border-radius: 6px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.buttonPrimary:hover {
+    background: #eef3ff;
+}
+
+.buttonPrimary:disabled {
+    border-color: #b9c4d8;
+    color: #b9c4d8;
+    cursor: not-allowed;
+}

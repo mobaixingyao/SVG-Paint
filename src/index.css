@@ -1,0 +1,38 @@
+:root {
+    --sg-page-bg: #f4f6f8;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--sg-page-bg);
+    font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+#root {
+    min-height: 100vh;
+}
+
+/* 编辑器 + 导出面板的容器 */
+.editorHost {
+    width: 100%;
+    max-width: 1024px;
+    margin: 0 auto;
+}
+
+/* 防御兜底：paint 编辑器内如果还有 img 元素失去尺寸约束（极端情况），
+   这里把 .editorHost 下的 img 限制在 32px 以内。导出预览图用 alt 排除。 */
+.editorHost img:not([alt="PNG 导出预览"]) {
+    max-width: 32px;
+    max-height: 32px;
+}
+.editorHost svg:not([alt="PNG 导出预览"]) {
+    max-width: 32px;
+    max-height: 32px;
+    display: inline-block;
+}

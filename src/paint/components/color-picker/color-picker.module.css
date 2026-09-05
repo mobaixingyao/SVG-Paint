@@ -1,0 +1,234 @@
+@import "../../css/colors.css";
+@import "../../css/units.css";
+
+/* Popover styles（官方：padding 4px、圆角 4px、无 min-width） */
+:global(.Popover-body) {
+    background: white;
+    border: 1px solid #ddd;
+    padding: 4px;
+    border-radius: 4px;
+    box-shadow: 0px 0px 8px 1px rgba(0, 0, 0, .3);
+}
+
+:global(.Popover-tipShape) {
+    fill: white;
+    stroke: #ddd;
+}
+
+.color-picker-container {
+    font-family: "Helvetica Neue", Helvetica, "Microsoft YaHei", sans-serif;
+    color: #575E75;
+    user-select: none;
+}
+
+/* 顶部 4 个渐变类型按钮（截图样式：小正方形并排，居中） */
+.gradient-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 6px 0 8px;
+}
+
+.gradient-btn {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid #d4d4d4;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: border-color .15s, box-shadow .15s;
+}
+
+.gradient-btn:hover {
+    border-color: #b0b0b0;
+}
+
+.gradient-btn-active,
+.gradient-btn-active:hover {
+    border-color: transparent;
+    box-shadow: 0 0 0 2px rgba(58, 101, 194, .35);
+}
+
+.gradient-fill {
+    width: calc(100% - 4px);
+    height: calc(100% - 4px);
+    border-radius: 3px;
+    pointer-events: none;
+}
+
+.gradient-fill-solid {
+    background: #3b8cff;
+}
+
+.gradient-fill-horizontal {
+    background: linear-gradient(to right, #ffffff, #9a9a9a);
+}
+
+.gradient-fill-vertical {
+    background: linear-gradient(to bottom, #ffffff, #9a9a9a);
+}
+
+.gradient-fill-radial {
+    background: radial-gradient(circle at center, #ffffff 0%, #9a9a9a 100%);
+}
+
+.divider {
+    border-top: 1px solid #ddd;
+    margin: 4px 6px;
+}
+
+/* 每个 slider 单元：上方一行小字「标签 数值」，下方滑块条（官方数值） */
+.row {
+    margin: 0;
+}
+
+.row-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    font-size: 0.65rem;
+    color: #575E75;
+    margin: 6px 0 2px;
+}
+
+[dir="ltr"] .label-readout {
+    margin-left: 8px;
+}
+
+[dir="rtl"] .label-readout {
+    margin-right: 8px;
+}
+
+.label-name {
+    font-weight: bold;
+}
+
+.label-readout {
+    font-variant-numeric: tabular-nums;
+}
+
+.row-slider > div[class*="container"] {
+    /* 保持 150px 固定宽（与 Slider 内部常量一致，handle 才定位正确）；
+       水平居中 + 收紧上下 margin，避免弹窗过高 */
+    margin: 2px auto 6px;
+}
+
+/* 透明度 slider 容器：内嵌棋盘格背景 */
+.opacity-slider-wrap {
+    position: relative;
+    margin: 0 auto;
+    width: 150px; /* 与 Slider 容器同宽，避免棋盘格背景溢出 */
+}
+
+.opacity-slider-wrap::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 11px;
+    background-image:
+        linear-gradient(45deg, #d0d0d0 25%, transparent 25%),
+        linear-gradient(-45deg, #d0d0d0 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #d0d0d0 75%),
+        linear-gradient(-45deg, transparent 75%, #d0d0d0 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+    z-index: 0;
+}
+
+.opacity-slider-wrap > div[class*="container"] {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    background-color: transparent !important;
+}
+/* 当前色 + Hex 输入框（整组居中） */
+.hex-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 6px 0;
+}
+
+.color-block {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    border: 1px solid #cfcfcf;
+    background-clip: padding-box;
+}
+
+.color-block-checker {
+    background-image:
+        linear-gradient(45deg, #d0d0d0 25%, transparent 25%),
+        linear-gradient(-45deg, #d0d0d0 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #d0d0d0 75%),
+        linear-gradient(-45deg, transparent 75%, #d0d0d0 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+}
+
+.hex-input {
+    flex: 0 0 auto;
+    width: 110px;
+    height: 26px;
+    padding: 0 10px;
+    border: 1px solid #cfcfcf;
+    border-radius: 14px;
+    font-size: 11px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    color: #333;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    background: #fff;
+}
+
+.hex-input:focus {
+    border-color: rgb(58, 101, 194);
+    box-shadow: 0 0 0 3px rgba(58, 101, 194, .18);
+}
+
+/* 底部工具按钮行（透明 + 吸管，居中并排） */
+.tool-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 6px 0 4px;
+}
+
+.tool-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+}
+
+.tool-btn:hover {
+    border-color: #b0b0b0;
+}
+
+.tool-btn img {
+    width: 18px;
+    height: 18px;
+}
+
+.tool-btn-active,
+.tool-btn-active:hover {
+    background: rgba(58, 101, 194, .12);
+    border-color: rgb(58, 101, 194);
+}

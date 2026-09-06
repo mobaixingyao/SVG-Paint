@@ -313,10 +313,10 @@ class PaperCanvas extends React.Component {
             this.pinchActive = true;
             this.panDragging = false;
             const pts = [...this.pinchPointers.values()];
-            this.pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
-            this.pinchStartMid = {x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2};
-            this.pinchStartZoom = paper.view.zoom;
-            this.pinchStartCenter = paper.view.center.clone();
+            // 增量式手势基准：每次移动相对上一次状态计算，避免两指事件不同步时
+            // 的缩放抖动与方向漂移
+            this.lastDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+            this.lastMid = {x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2};
             const [firstId] = [...this.pinchPointers.keys()];
             if (firstId !== e.pointerId) {
                 const p = this.pinchPointers.get(firstId);
@@ -343,19 +343,18 @@ class PaperCanvas extends React.Component {
         const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
         const midX = (pts[0].x + pts[1].x) / 2;
         const midY = (pts[0].y + pts[1].y) / 2;
-        // 1) 中点位移 → 平移
-        const midDx = midX - this.pinchStartMid.x;
-        const midDy = midY - this.pinchStartMid.y;
-        paper.view.center = this.pinchStartCenter.add(
-            new paper.Point(midDx, midDy).divide(this.pinchStartZoom)
+        // 1) 中点位移 → 平移（内容跟手：视口中心反向移动）
+        paper.view.center = paper.view.center.subtract(
+            new paper.Point(midX - this.lastMid.x, midY - this.lastMid.y).divide(paper.view.zoom)
         );
-        // 2) 距离比例 → 围绕中点缩放（夹在最低/最高缩放之间）
-        const targetZoom = Math.max(
-            OUTERMOST_ZOOM_LEVEL,
-            Math.min(8, this.pinchStartZoom * (dist / this.pinchStartDist))
-        );
+        // 2) 距离比例 → 围绕当前中点做乘性缩放（夹在最低/最高缩放之间）
+        let targetZoom = paper.view.zoom * (dist / this.lastDist);
+        targetZoom = Math.max(OUTERMOST_ZOOM_LEVEL, Math.min(8, targetZoom));
         const midProject = paper.view.viewToProject(new paper.Point(midX, midY));
         zoomOnFixedPoint(targetZoom - paper.view.zoom, midProject);
+        // 更新增量基准
+        this.lastMid = {x: midX, y: midY};
+        this.lastDist = dist;
     }
     handlePinchPointerUp (e) {
         if (e.__syntheticUp || !this.pinchPointers.has(e.pointerId)) return;
@@ -364,12 +363,10 @@ class PaperCanvas extends React.Component {
         e.preventDefault();
         e.stopPropagation();
         if (this.pinchPointers.size >= 2) {
-            // 捏合中抬起一指后仍有两指 → 以剩余两指重建手势基准
+            // 捏合中抬起一指后仍有两指 → 以剩余两指重建增量基准
             const pts = [...this.pinchPointers.values()];
-            this.pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
-            this.pinchStartMid = {x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2};
-            this.pinchStartZoom = paper.view.zoom;
-            this.pinchStartCenter = paper.view.center.clone();
+            this.lastDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+            this.lastMid = {x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2};
         } else if (this.pinchPointers.size === 0) {
             this.pinchActive = false; // 全部抬起才交还事件给纸面
         }

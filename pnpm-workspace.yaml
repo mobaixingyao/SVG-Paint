@@ -9,3 +9,10 @@ packages:
 ignoredBuiltDependencies:
   - core-js
   - esbuild
+# Cloudflare 的构建镜像全局放行依赖构建脚本（dangerouslyAllowAllBuilds），
+# 任何"跳过脚本"类配置都拦不住。tsx@4.23（scratch-l10n 依赖链）拉进来的
+# esbuild@0.28.2 在 lockfile 里缺失主流平台二进制（仅登记了 4 个冷门平台），
+# 其 postinstall 必然校验失败。把 esbuild 全树钉到 0.19.3（vite 同版本），
+# 让坏包彻底不出现。tsx 只是 scratch-l10n 的 i18n 工具链依赖，本项目从不执行。
+overrides:
+  esbuild: 0.19.3

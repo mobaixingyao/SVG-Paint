@@ -1,18 +1,20 @@
 # 兼容 pnpm 10 与 11：
 # - pnpm 10 要求 workspace 文件必须含 packages 字段（否则 `packages field missing or empty`）
-# - 构建脚本白名单/黑名单统一用 ignoredBuiltDependencies（两端都支持）：
-#   core-js 的 postinstall 只是捐赠提示；esbuild 二进制走 optionalDependencies
-#   （@esbuild/win32-x64），postinstall 只是校验且对 lockfile 里未使用的
-#   esbuild@0.28.2 会校验失败，故全部跳过
+# - overrides 同时写在 workspace yaml（pnpm 11 读）和 package.json#pnpm.overrides
+#   （pnpm 10 读）两处：Cloudflare 的 pnpm 10.11.1 做 frozen-lockfile 校验时
+#   读取 overrides 的来源与本地不一致，只写一处会误报
+#   ERR_PNPM_LOCKFILE_CONFIG_MISMATCH。esbuild 全树钉 0.19.3：
+#   scratch-l10n→tsx→esbuild@0.28.2 的 lockfile 条目缺失主流平台二进制、
+#   postinstall 必炸（tsx 从不被执行，esbuild 二进制由 optionalDependencies 提供）。
+# - allowBuilds（pnpm 11 的键）显式放行剩余两个无害脚本：core-js 只是捐赠
+#   提示、esbuild@0.19.3 校验自己的二进制。pnpm 11 在 CI 下对"未审批脚本"
+#   直接报错，必须写 true；pnpm 10.11 不认识此键、默认跳过脚本（也无害）。
+# - 不要加 onlyBuiltDependencies：Cloudflare 构建镜像全局放行构建脚本，
+#   若其机制与本键共存会报 ERR_PNPM_CONFIG_CONFLICT_BUILT_DEPENDENCIES。
 packages:
   - .
-ignoredBuiltDependencies:
-  - core-js
-  - esbuild
-# Cloudflare 的构建镜像全局放行依赖构建脚本（dangerouslyAllowAllBuilds），
-# 任何"跳过脚本"类配置都拦不住。tsx@4.23（scratch-l10n 依赖链）拉进来的
-# esbuild@0.28.2 在 lockfile 里缺失主流平台二进制（仅登记了 4 个冷门平台），
-# 其 postinstall 必然校验失败。把 esbuild 全树钉到 0.19.3（vite 同版本），
-# 让坏包彻底不出现。tsx 只是 scratch-l10n 的 i18n 工具链依赖，本项目从不执行。
+allowBuilds:
+  core-js: true
+  esbuild: true
 overrides:
   esbuild: 0.19.3

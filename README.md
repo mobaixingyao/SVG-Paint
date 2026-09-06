@@ -2,6 +2,12 @@
 
 > 从 Scratch `scratch-paint` 剥离出来的独立 SVG 编辑器，纯前端运行，支持高清 PNG 导出与 SVG 导入。
 
+# 预览
+
+<img width="2639" height="1723" alt="image" src="https://github.com/user-attachments/assets/a22ad7a7-1756-4b6c-b50f-3d5660415c05" />
+
+在线体验地址：http://svgpaint.mobaixingyao.dpdns.org/
+
 ## 特性
 
 - ✏️ 基于 scratch-paint 的完整矢量 / 位图绘图工具（选择、重塑、画笔、橡皮、填充、文字、直线、圆形、矩形等）

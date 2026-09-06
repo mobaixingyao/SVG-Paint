@@ -35,12 +35,16 @@ class App extends React.Component {
             'handleUpdateImage',
             'handleLocaleChange',
             'handleImportProject',
+            'handleImportImage',
             'handleToggleExport',
             'handleTopImportClick',
-            'handleTopImportChange'
+            'handleTopImportChange',
+            'handleTopImageClick',
+            'handleTopImageChange'
         ]);
         this.id = 0;
         this.svgFileInput = React.createRef();
+        this.imageFileInput = React.createRef();
         this.state = {
             locale: 'zh-cn', // 默认中文，对齐原版中文界面
             name: '造型1',
@@ -78,6 +82,47 @@ class App extends React.Component {
         } catch (err) {
             alert('读取 SVG 失败：' + (err.message || String(err)));
         }
+    }
+    handleTopImageClick () {
+        if (this.imageFileInput.current) this.imageFileInput.current.click();
+    }
+    async handleTopImageChange (e) {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = ''; // 允许重复选择同一文件
+        if (!file) return;
+        const isJpg = /\.jpe?g$/i.test(file.name) || file.type === 'image/jpeg';
+        const isPng = /\.png$/i.test(file.name) || file.type === 'image/png';
+        if (!isJpg && !isPng) {
+            alert('仅支持 PNG 或 JPG 图片');
+            return;
+        }
+        try {
+            const dataUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error || new Error('图片读取失败'));
+                reader.readAsDataURL(file);
+            });
+            this.handleImportImage(
+                dataUrl,
+                file.name || (isJpg ? 'image.jpg' : 'image.png')
+            );
+        } catch (err) {
+            alert('读取图片失败：' + (err.message || String(err)));
+        }
+    }
+    handleImportImage (dataUrl, name) {
+        // 触发 PaperCanvas 重新加载：imageId 变化让 componentWillReceiveProps 走 switchCostume
+        // imageFormat='image' → 以矢量层 <image> 对象导入，保持矢量模式、居中显示
+        this.id += 1;
+        this.setState({
+            image: dataUrl,
+            imageFormat: 'image',
+            imageId: this.id,
+            name: name || 'image',
+            rotationCenterX: undefined,
+            rotationCenterY: undefined
+        });
     }
     handleImportProject (svg, name) {
         // 触发 PaperCanvas 重新加载：imageId 必须变化才能让 useEffect 路径生效
@@ -141,6 +186,13 @@ class App extends React.Component {
                                 style={{display: 'none'}}
                                 onChange={this.handleTopImportChange}
                             />
+                            <input
+                                ref={this.imageFileInput}
+                                type="file"
+                                accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                                style={{display: 'none'}}
+                                onChange={this.handleTopImageChange}
+                            />
                             <button
                                 type="button"
                                 className={styles.topBarImport}
@@ -148,6 +200,14 @@ class App extends React.Component {
                                 title="导入 SVG 文件到画布"
                             >
                                 导入 SVG
+                            </button>
+                            <button
+                                type="button"
+                                className={styles.topBarImport}
+                                onClick={this.handleTopImageClick}
+                                title="导入 PNG / JPG 图片到画布（转为位图）"
+                            >
+                                导入图片
                             </button>
                             <button
                                 type="button"
@@ -208,6 +268,7 @@ class App extends React.Component {
                                     svgString={svgString}
                                     name={name}
                                     onImportProject={this.handleImportProject}
+                                    onImportImage={this.handleImportImage}
                                 />
                             </div>
                         </div>

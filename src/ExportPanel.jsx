@@ -59,7 +59,7 @@ const parseProjectFile = async (file) => {
     throw new Error('无法识别文件格式：既不是 scsvg-project JSON，也不是 SVG 文件');
 };
 
-const ExportPanel = ({svgString, name, onImportProject}) => {
+const ExportPanel = ({svgString, name, onImportProject, onImportImage}) => {
     // 输入模式：scale = 倍率；custom = 自定义宽高
     const [mode, setMode] = useState('scale');
     const [scale, setScale] = useState(3); // 默认 3x，充分锐利
@@ -76,6 +76,7 @@ const ExportPanel = ({svgString, name, onImportProject}) => {
     const lastSvgRef = useRef(svgString);
     const fileInputRef = useRef(null);
     const svgInputRef = useRef(null);
+    const imageInputRef = useRef(null);
 
     // 画布/图形的固有尺寸（逻辑单位）
     const intrinsic = useMemo(() => {
@@ -200,6 +201,43 @@ const ExportPanel = ({svgString, name, onImportProject}) => {
         }
     };
 
+    const handleImportImageClick = () => {
+        setProjectError(null);
+        if (imageInputRef.current) imageInputRef.current.click();
+    };
+
+    const handleImportImageFile = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = ''; // 允许同一文件重复选择
+        if (!file) return;
+        const isJpg = /\.jpe?g$/i.test(file.name) || file.type === 'image/jpeg';
+        const isPng = /\.png$/i.test(file.name) || file.type === 'image/png';
+        if (!isJpg && !isPng) {
+            setProjectError('仅支持 PNG 或 JPG 图片');
+            return;
+        }
+        setImporting(true);
+        try {
+            const dataUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error || new Error('图片读取失败'));
+                reader.readAsDataURL(file);
+            });
+            if (typeof onImportImage === 'function') {
+                onImportImage(
+                    dataUrl,
+                    file.name || (isJpg ? 'image.jpg' : 'image.png')
+                );
+            }
+            setProjectError(null);
+        } catch (err) {
+            setProjectError(err.message || String(err));
+        } finally {
+            setImporting(false);
+        }
+    };
+
     const handleImportFile = async (e) => {
         const file = e.target.files && e.target.files[0];
         e.target.value = ''; // 允许同一文件重复选择
@@ -284,6 +322,24 @@ const ExportPanel = ({svgString, name, onImportProject}) => {
                         {svgImporting ? '导入中…' : '导入 SVG 文件'}
                     </button>
                     <span className={styles.hint}>把 .svg 直接加载到画布（替换当前内容）</span>
+                </div>
+                <div className={styles.row}>
+                    <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                        style={{display: 'none'}}
+                        onChange={handleImportImageFile}
+                    />
+                    <button
+                        type="button"
+                        className={styles.button}
+                        onClick={handleImportImageClick}
+                        disabled={importing}
+                    >
+                        {importing ? '导入中…' : '导入图片'}
+                    </button>
+                    <span className={styles.hint}>把 PNG / JPG 加载到画布（转为位图）</span>
                 </div>
                 {projectError && <div className={styles.error}>✕ {projectError}</div>}
             </div>
@@ -426,7 +482,8 @@ const ExportPanel = ({svgString, name, onImportProject}) => {
 ExportPanel.propTypes = {
     svgString: PropTypes.string,
     name: PropTypes.string,
-    onImportProject: PropTypes.func
+    onImportProject: PropTypes.func,
+    onImportImage: PropTypes.func
 };
 
 export default ExportPanel;

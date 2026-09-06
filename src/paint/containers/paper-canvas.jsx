@@ -264,6 +264,40 @@ class PaperCanvas extends React.Component {
                 this.recalibrateSize();
             };
             imgElement.src = image;
+        } else if (format === 'image') {
+            // 位图文件以「矢量层 <image> 对象」导入：
+            // 保持矢量模式（不切换到位图工具栏），导出 SVG 时 paper 会写成内嵌 base64 的 <image> 元素
+            this.props.changeFormat(Formats.VECTOR_SKIP_CONVERT);
+
+            const imgElement = new Image();
+            this.queuedImageToLoad = imgElement;
+            imgElement.onload = () => {
+                if (!this.queuedImageToLoad) return;
+                this.queuedImageToLoad = null;
+
+                const raster = new paper.Raster(imgElement);
+                paper.project.activeLayer.addChild(raster);
+                // 与矢量导入保持一致：内部按 2x 存储，导出（0.5x）后正好还原原始像素尺寸
+                raster.scale(2);
+                // 居中：图片中心对齐画板中心，不缩放、不裁剪
+                raster.position = CENTER;
+
+                this.maybeZoomToFit();
+                // 立刻序列化一次矢量内容，让导出面板马上拿到含 <image> 的 SVG。
+                // 第二个参数强制按矢量导出，避免残留位图模式导致导出成 ImageData。
+                if (this.props.onUpdateImage) {
+                    this.props.onUpdateImage(false /* skipSnapshot */, Formats.VECTOR);
+                } else {
+                    performSnapshot(this.props.undoSnapshot, Formats.VECTOR_SKIP_CONVERT);
+                }
+                this.recalibrateSize();
+            };
+            imgElement.onerror = () => {
+                if (!this.queuedImageToLoad) return;
+                this.queuedImageToLoad = null;
+                log.error(`Image import failed: ${format}`);
+            };
+            imgElement.src = image;
         } else if (format === 'svg') {
             this.props.changeFormat(Formats.VECTOR_SKIP_CONVERT);
             this.importSvg(image, rotationCenterX, rotationCenterY);
@@ -464,6 +498,7 @@ PaperCanvas.propTypes = {
     ]),
     imageFormat: PropTypes.string, // The incoming image's data format, used during import. The user could switch this.
     imageId: PropTypes.string,
+    onUpdateImage: PropTypes.func,
     rotationCenterX: PropTypes.number,
     rotationCenterY: PropTypes.number,
     saveZoomLevel: PropTypes.func.isRequired,

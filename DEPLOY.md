@@ -2,7 +2,7 @@
 
 SVG Paint 是从 Scratch `scratch-paint` 剥离出来的纯前端 SVG 编辑器，支持高清 PNG 导出、SVG 导入、自定义字体等。
 
-本项目为 **纯静态前端 SPA**（Vite + React + Redux），所有渲染与导出均在浏览器端完成，**无后端依赖**。因此适合部署到 **Cloudflare Pages**（静态托管），而非 Cloudflare Workers。
+本项目为 **纯静态前端 SPA**（Vite + React + Redux），所有渲染与导出均在浏览器端完成，**无后端依赖**。部署采用 Cloudflare **Workers with static assets** 模式（静态资源托管，Pages 流程的现行替代），通过 Git 集成自动构建部署。
 
 ## 本地开发 / 构建
 
@@ -13,27 +13,33 @@ pnpm build        # 构建产物输出到 dist/
 pnpm preview      # 预览构建产物
 ```
 
-## 部署到 Cloudflare Pages
+## 部署到 Cloudflare（Workers & Pages 统一 Builds，推荐）
 
-### 方式 A：连接 Git 仓库（推荐）
+项目通过 Git 集成部署，构建系统分三段：**Install（`pnpm install --frozen-lockfile`）→ Build → Deploy（`npx wrangler deploy`）**。控制台里需要确认两点：
 
-1. Cloudflare 控制台 → **Workers & Pages** → 创建 **Pages** → 连接 Git 仓库 `mobaixingyao/SVG-Paint`。
-2. 构建设置：
-   - 构建命令（Build command）：`pnpm build`
-   - 输出目录（Output directory）：`dist`
-   - 根目录（Root directory）：留空（即仓库根）
-   - Node.js 版本：20 或更高
-3. 保存并部署。此后每次 push 到 `main` 分支会自动触发重新部署。
-4. Cloudflare 会读取仓库中的 `pnpm-lock.yaml` 自动使用 pnpm 安装依赖。
+1. **Build command 必须是 `pnpm build`**。如果留空，构建阶段会被跳过，
+   `dist/` 不存在，部署阶段直接报 `Missing entry-point`。
+2. Deploy command 保持 `npx wrangler deploy`（默认即可）。仓库根的
+   `wrangler.toml` 已采用 **Workers with static assets** 模式（`[assets]`
+   指向 `./dist`），这是 Cloudflare 现行推荐的静态站部署方式；
+   `not_found_handling = "single-page-application"` 让未知路径回退到 index.html。
+
+部署成功后可在 Workers & Pages 项目详情里看到 `*.workers.dev` 预览地址，
+自定义域名在 **Custom domains** 中绑定。
+
+> 历史：本项目最初按经典 Pages 流程配置（`pages_build_output_dir`），但新版
+> wrangler 4.x 的 `wrangler deploy` 已不兼容该格式（警告后按 Workers 路径
+> 找入口并报错），因此迁移到 `[assets]` 模式。
 
 ### 方式 B：Wrangler 命令行直传（无需 Git 集成）
 
 ```bash
 pnpm build
-npx wrangler pages deploy dist
+npx wrangler deploy
 ```
 
-首次使用需先 `npx wrangler login` 完成授权。仓库根已提供 `wrangler.toml`（`pages_build_output_dir = "dist"`）。
+首次使用需先 `npx wrangler login` 完成授权。仓库根的 `wrangler.toml`
+（`[assets] directory = "./dist"`）已配置好部署目标。
 
 ## CI 构建注意点（重要）
 
@@ -62,6 +68,6 @@ npx wrangler pages deploy dist
 
 ## 其他
 
-- 单页应用、URL 不变化，无需配置 SPA fallback / `_routes.json`。
+- 单页应用，`wrangler.toml` 已配置 `not_found_handling = "single-page-application"`（未知路径回退 index.html）。
 - 构建产物约 2.6MB（主要来自 paper.js），Cloudflare Pages 免费额度完全够用（单文件上限约 25MB）。
 - 如需自定义域名，在 Pages 项目的 **Custom domains** 中绑定即可。

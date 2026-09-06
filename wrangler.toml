@@ -1,2 +1,11 @@
+# 部署模式：Workers with static assets（Cloudflare 现行推荐，替代 Pages 流程）。
+# 注意：不要写 pages_build_output_dir —— 新版 wrangler (4.x) 的 `wrangler deploy`
+# 已不再兼容 Pages 格式的 toml（会警告并按 Workers 路径找入口，报
+# "Missing entry-point"）。CI 里的部署命令 `npx wrangler deploy` 依赖本文件。
 name = "svg-paint"
-pages_build_output_dir = "dist"
+compatibility_date = "2026-09-03"
+
+[assets]
+directory = "./dist"
+# 纯前端单页应用：未知路径回退到 index.html
+not_found_handling = "single-page-application"

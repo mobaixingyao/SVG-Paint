@@ -208,3 +208,32 @@
     background: #e2e4e8;
     transform: rotate(90deg);
 }
+/* 页脚：仓库链接 */
+.footer {
+    flex: none;
+    display: flex;
+    justify-content: center;
+    padding: 6px 12px 8px;
+    background: #eef1f6;
+}
+
+.footerLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #66738c;
+    font-size: 12px;
+    text-decoration: none;
+}
+
+.footerLink:hover {
+    color: rgb(58, 101, 194);
+    text-decoration: underline;
+}
+
+.footerIcon {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    flex-shrink: 0;
+}

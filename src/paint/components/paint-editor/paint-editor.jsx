@@ -27,6 +27,7 @@ import FixedToolsContainer from '../../containers/fixed-tools.jsx';
 import ModeToolsContainer from '../../containers/mode-tools.jsx';
 import OvalMode from '../../containers/oval-mode.jsx';
 import RectMode from '../../containers/rect-mode.jsx';
+import PanMode from '../../containers/pan-mode.jsx';
 import ReshapeMode from '../../containers/reshape-mode.jsx';
 import SelectMode from '../../containers/select-mode.jsx';
 import StrokeColorIndicatorComponent from '../../containers/stroke-color-indicator.jsx';
@@ -119,6 +120,7 @@ const PaintEditorComponent = props => {
                 {/* Modes */}
                 {props.canvas !== null && isVector(props.format) ? (
                     <div className={styles.modeSelector}>
+                        <PanMode />
                         <SelectMode
                             onUpdateImage={props.onUpdateImage}
                         />
@@ -152,6 +154,7 @@ const PaintEditorComponent = props => {
 
                 {props.canvas !== null && isBitmap(props.format) ? (
                     <div className={styles.modeSelector}>
+                        <PanMode />
                         <BitBrushMode
                             onUpdateImage={props.onUpdateImage}
                         />

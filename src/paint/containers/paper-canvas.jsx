@@ -5,6 +5,7 @@ import {connect} from 'react-redux';
 import paper from '@scratch/paper';
 import {sanitizeSvg} from '@scratch/scratch-svg-renderer';
 import Formats from '../lib/format';
+import Modes from '../lib/modes';
 import log from '../log/log';
 
 import {stripInvalidPaperData} from '../helper/strip-invalid-paper-data';
@@ -44,7 +45,15 @@ class PaperCanvas extends React.Component {
             'handleSpacePanMouseDown',
             'handleSpacePanMouseMove',
             'handleSpacePanMouseUp',
-            'endSpacePan'
+            'endSpacePan',
+            // 抓手（PAN 模式）
+            'setPanMode',
+            'handlePanPointerDown',
+            'handlePanPointerMove',
+            'handlePanPointerUp',
+            'handlePanTouchStart',
+            'handlePanTouchMove',
+            'handlePanTouchEnd'
         ]);
     }
     componentDidMount () {
@@ -84,8 +93,28 @@ class PaperCanvas extends React.Component {
         if (this.canvas) {
             this.canvas.addEventListener('mousedown', this.handleSpacePanMouseDown, true);
         }
+
+        // 抓手（PAN 模式）：在 canvas 父节点上以捕获阶段拦截指针/触摸事件，
+        // 保证先于 paper.js（注册在 canvas 上）执行，stopPropagation 即可阻断
+        this.panModeActive = false;
+        this.panDragging = false;
+        if (this.canvas && this.canvas.parentElement) {
+            this.panEventRoot = this.canvas.parentElement;
+            this.panEventRoot.addEventListener('pointerdown', this.handlePanPointerDown, true);
+            this.panEventRoot.addEventListener('pointermove', this.handlePanPointerMove, true);
+            this.panEventRoot.addEventListener('pointerup', this.handlePanPointerUp, true);
+            this.panEventRoot.addEventListener('pointercancel', this.handlePanPointerUp, true);
+            this.panEventRoot.addEventListener('touchstart', this.handlePanTouchStart, true);
+            this.panEventRoot.addEventListener('touchmove', this.handlePanTouchMove, true);
+            this.panEventRoot.addEventListener('touchend', this.handlePanTouchEnd, true);
+            this.setPanMode(this.props.mode === Modes.PAN);
+        }
     }
     componentWillReceiveProps (newProps) {
+        if (this.props.mode !== newProps.mode) {
+            // 抓手（PAN 模式）开关：开启后拦截画布指针事件做平移
+            this.setPanMode(newProps.mode === Modes.PAN);
+        }
         if (this.props.imageId !== newProps.imageId) {
             // 外部导入新造型（非编辑器内部 zoom-level 管理）→ 完成后自动适合视图
             if (!newProps.zoomLevelId) {
@@ -114,6 +143,16 @@ class PaperCanvas extends React.Component {
         window.removeEventListener('mouseup', this.handleSpacePanMouseUp);
         if (this.canvas) {
             this.canvas.removeEventListener('mousedown', this.handleSpacePanMouseDown, true);
+        }
+        // 抓手（PAN 模式）清理
+        if (this.panEventRoot) {
+            this.panEventRoot.removeEventListener('pointerdown', this.handlePanPointerDown, true);
+            this.panEventRoot.removeEventListener('pointermove', this.handlePanPointerMove, true);
+            this.panEventRoot.removeEventListener('pointerup', this.handlePanPointerUp, true);
+            this.panEventRoot.removeEventListener('pointercancel', this.handlePanPointerUp, true);
+            this.panEventRoot.removeEventListener('touchstart', this.handlePanTouchStart, true);
+            this.panEventRoot.removeEventListener('touchmove', this.handlePanTouchMove, true);
+            this.panEventRoot.removeEventListener('touchend', this.handlePanTouchEnd, true);
         }
         paper.remove();
     }
@@ -177,6 +216,69 @@ class PaperCanvas extends React.Component {
             window.removeEventListener('mouseup', this.handleSpacePanMouseUp);
         }
         if (this.canvas) this.canvas.style.cursor = this.spaceDown ? 'grab' : (this.props.cursor || 'default');
+    }
+    // ---- 抓手（PAN 模式）：指针/触摸直接拖动平移 ----
+    setPanMode (active) {
+        this.panModeActive = active;
+        if (this.canvas) {
+            this.canvas.style.cursor = active ? 'grab' : (this.props.cursor || 'default');
+            // 阻止浏览器把触摸手势当页面滚动，保证 pointermove 连续触发
+            this.canvas.style.touchAction = active ? 'none' : '';
+        }
+        if (!active) this.panDragging = false;
+    }
+    handlePanPointerDown (e) {
+        if (!this.panModeActive || !paper.view) return;
+        if (!e.isPrimary) return; // 多指触控只跟随主指针
+        e.preventDefault();
+        e.stopPropagation();
+        this.panStartClient = {x: e.clientX, y: e.clientY};
+        this.panStartCenter = paper.view.center.clone();
+        this.panDragging = true;
+        if (this.canvas) {
+            this.canvas.style.cursor = 'grabbing';
+            try {
+                // 拖出画布后事件仍回到 canvas，保证父捕获持续生效
+                this.canvas.setPointerCapture(e.pointerId);
+            } catch (err) { /* 指针可能已释放 */ }
+        }
+    }
+    handlePanPointerMove (e) {
+        if (!this.panDragging) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const dx = e.clientX - this.panStartClient.x;
+        const dy = e.clientY - this.panStartClient.y;
+        // 内容跟随指针：视口中心反向移动（除以 zoom 转为 project 单位）
+        paper.view.center = this.panStartCenter.subtract(
+            new paper.Point(dx, dy).divide(paper.view.zoom)
+        );
+        setWorkspaceBounds();
+        clampViewBounds();
+        this.props.updateViewBounds(paper.view.matrix);
+    }
+    handlePanPointerUp (e) {
+        if (!this.panDragging) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.panDragging = false;
+        // PAN 模式仍处于激活态，光标保持抓手
+        if (this.canvas) this.canvas.style.cursor = 'grab';
+    }
+    handlePanTouchStart (e) {
+        // 触摸设备：拦截 legacy touch 事件流，防止 paper 工具/浏览器滚动接管
+        if (!this.panModeActive) return;
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    handlePanTouchMove (e) {
+        if (!this.panModeActive || !this.panDragging) return;
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    handlePanTouchEnd (e) {
+        if (!this.panModeActive) return;
+        e.preventDefault();
     }
     clearQueuedImport () {
         if (this.queuedImport) {
@@ -476,7 +578,7 @@ class PaperCanvas extends React.Component {
             <canvas
                 className={styles.paperCanvas}
                 ref={this.setCanvas}
-                style={{cursor: this.props.cursor}}
+                style={{cursor: this.panModeActive ? 'grab' : this.props.cursor}}
                 resize="true"
             />
         );
@@ -491,6 +593,7 @@ PaperCanvas.propTypes = {
     clearSelectedItems: PropTypes.func.isRequired,
     clearUndo: PropTypes.func.isRequired,
     cursor: PropTypes.string,
+    mode: PropTypes.string,
     format: PropTypes.oneOf(Object.keys(Formats)),
     image: PropTypes.oneOfType([
         PropTypes.string,

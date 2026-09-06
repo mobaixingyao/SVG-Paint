@@ -1,3 +1,11 @@
-allowBuilds:
-  core-js: false
-  esbuild: false
+# 兼容 pnpm 10 与 11：
+# - pnpm 10 要求 workspace 文件必须含 packages 字段（否则 `packages field missing or empty`）
+# - 构建脚本白名单/黑名单统一用 ignoredBuiltDependencies（两端都支持）：
+#   core-js 的 postinstall 只是捐赠提示；esbuild 二进制走 optionalDependencies
+#   （@esbuild/win32-x64），postinstall 只是校验且对 lockfile 里未使用的
+#   esbuild@0.28.2 会校验失败，故全部跳过
+packages:
+  - .
+ignoredBuiltDependencies:
+  - core-js
+  - esbuild

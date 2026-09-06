@@ -37,7 +37,17 @@ npx wrangler pages deploy dist
 
 ## CI 构建注意点（重要）
 
-`scratch-l10n` 包带有 `prepare: husky install` 脚本，被 pnpm 的 `onlyBuiltDependencies` 白名单挡掉后会被放入 `node_modules/.ignored`，导致 `App.jsx` 中 `import ... from 'scratch-l10n/locales/paint-editor-msgs'` 在构建时解析失败。
+- **`pnpm-workspace.yaml` 必须保留 `packages` 字段**。Cloudflare Pages 默认使用
+  pnpm 10（本仓库构建日志检测为 10.11.1），pnpm 10 把该文件当作 workspace 定义，
+  缺少 `packages` 会让 `pnpm install` 直接报
+  `ERROR packages field missing or empty`。本地 pnpm 11 虽然能容忍缺省，
+  但该字段必须保留以兼容 CI。构建脚本白/黑名单也统一写在这个文件里
+  （`ignoredBuiltDependencies: core-js / esbuild`，pnpm 10 与 11 都支持，
+  esbuild 二进制由 optionalDependencies 提供，跳过 postinstall 不影响构建）。
+- `scratch-l10n` 包带有 `prepare: husky install` 脚本，被 pnpm 的
+  `onlyBuiltDependencies` 白名单挡掉后会被放入 `node_modules/.ignored`，导致
+  `App.jsx` 中 `import ... from 'scratch-l10n/locales/paint-editor-msgs'`
+  在构建时解析失败。
 
 `package.json` 中的 `postinstall` 脚本会在依赖安装后自动把该包复制回 `node_modules`，**请勿删除**，否则 Cloudflare Pages 构建会失败。
 

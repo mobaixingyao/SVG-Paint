@@ -314,6 +314,10 @@ class ImageToSvgDialog extends React.Component {
                     </div>
                     <div className={styles.body}>
                         <div className={styles.leftCol}>
+                            <div className={styles.warnBox}>
+                                ⚠ 请勿上传大图或细节过多的图片：转换耗时较长且占用大量内存，
+                                可能导致编辑器长时间无响应；如一定要转换，请先备份当前作品。
+                            </div>
                             <div className={styles.sectionLabel}>1. 选择图片（PNG / JPG，支持 Ctrl+V 粘贴）</div>
                             <div className={styles.pickRow}>
                                 <input

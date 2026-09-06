@@ -388,3 +388,28 @@
     font-size: 12px;
     line-height: 1.6;
 }
+
+/* ---------- 移动端适配：单列堆叠 ---------- */
+@media (max-width: 720px) {
+    .overlay {
+        padding: 10px;
+        align-items: flex-start;
+    }
+    .dialog {
+        margin-top: 10px;
+        max-height: 94vh;
+        max-height: 94dvh;
+        padding: 14px 14px 12px;
+    }
+    .body {
+        flex-direction: column;
+        gap: 14px;
+    }
+    .leftCol,
+    .rightCol {
+        flex: 1 1 auto;
+    }
+    .previewWrap {
+        height: 220px;
+    }
+}

@@ -132,6 +132,37 @@
     cursor: pointer;
 }
 
+/* ICO 尺寸多选 chip */
+.icoSizes {
+    display: inline-flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.icoSize {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid #ccc;
+    background: #fff;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 12px;
+    color: #444;
+    cursor: pointer;
+    user-select: none;
+}
+
+.icoSizeOn {
+    border-color: rgb(58, 101, 194);
+    background: #eef3ff;
+    color: rgb(58, 101, 194);
+}
+
+.icoSize input {
+    margin: 0;
+}
+
 .select {
     padding: 4px 8px;
     border: 1px solid #ccc;

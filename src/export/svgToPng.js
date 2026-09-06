@@ -92,17 +92,14 @@ export function computeExportSize (svgString, opts = {}) {
 }
 
 /**
- * 光栅化主入口。
- * @param {string} svgString
- * @param {object} opts
- *   width/height/scale: 同 computeExportSize
- *   background: 背景色（CSS 颜色），默认 null = 透明
- *   awaitFonts: 默认 true，光栅化前等待字体就绪
- * @returns {Promise<{blob, dataUrl, width, height, bytes}>}
+ * 渲染 SVG 到指定像素尺寸的 canvas（ICO 导出等场景复用）。
+ * width/height 为目标像素；与图形纵横比不同时内容居中(meet)不变形，
+ * 未覆盖区域透明（或 background 填充）。
+ * @returns {Promise<HTMLCanvasElement>}
  */
-export async function rasterizeSvg (svgString, opts = {}) {
+export async function renderSvgCanvas (svgString, {width, height, background = null, awaitFonts = true} = {}) {
     const {root, viewBox} = parseSvg(svgString);
-    const size = computeExportSize(svgString, opts);
+    const size = computeExportSize(svgString, {width, height});
     const {width: W, height: H} = size;
 
     // 克隆并规范化，避免污染原节点
@@ -123,7 +120,7 @@ export async function rasterizeSvg (svgString, opts = {}) {
 
     const xml = new XMLSerializer().serializeToString(clone);
 
-    if (opts.awaitFonts !== false) {
+    if (awaitFonts) {
         try {
             await document.fonts.ready;
         } catch (e) { /* 字体等待失败不阻塞导出 */ }
@@ -136,18 +133,37 @@ export async function rasterizeSvg (svgString, opts = {}) {
         canvas.width = W;
         canvas.height = H;
         const ctx = canvas.getContext('2d');
-        if (opts.background) {
-            ctx.fillStyle = opts.background;
+        if (background) {
+            ctx.fillStyle = background;
             ctx.fillRect(0, 0, W, H);
         }
         ctx.drawImage(img, 0, 0, W, H);
-
-        const blob = await canvasToBlob(canvas);
-        const dataUrl = canvas.toDataURL('image/png');
-        return {blob, dataUrl, width: W, height: H, bytes: blob.size};
+        return canvas;
     } finally {
         URL.revokeObjectURL(url);
     }
+}
+
+/**
+ * 光栅化主入口。
+ * @param {string} svgString
+ * @param {object} opts
+ *   width/height/scale: 同 computeExportSize
+ *   background: 背景色（CSS 颜色），默认 null = 透明
+ *   awaitFonts: 默认 true，光栅化前等待字体就绪
+ * @returns {Promise<{blob, dataUrl, width, height, bytes}>}
+ */
+export async function rasterizeSvg (svgString, opts = {}) {
+    const canvas = await renderSvgCanvas(svgString, {
+        width: opts.width,
+        height: opts.height,
+        background: opts.background
+    });
+    const W = canvas.width;
+    const H = canvas.height;
+    const blob = await canvasToBlob(canvas);
+    const dataUrl = canvas.toDataURL('image/png');
+    return {blob, dataUrl, width: W, height: H, bytes: blob.size};
 }
 
 /** 导出成 PNG 文件（a[download] 触发浏览器下载） */

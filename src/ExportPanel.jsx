@@ -2,7 +2,8 @@ import PropTypes from 'prop-types';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 
 import styles from './export-panel.module.css';
-import {computeExportSize, downloadPng, downloadSvg, parseSvg, rasterizeSvg} from './export/svgToPng.js';
+import {computeExportSize, downloadPng, downloadSvg, parseSvg, rasterizeSvg, renderSvgCanvas} from './export/svgToPng.js';
+import {downloadIco, encodeIco} from './export/icoEncoder.js';
 
 const PROJECT_FORMAT_TAG = 'scsvg-project/v1';
 
@@ -11,6 +12,8 @@ const BACKGROUNDS = [
     {value: '', label: '透明'},
     {value: '#ffffff', label: '白色'}
 ];
+const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256];
+const ICO_DEFAULT_SIZES = [16, 32, 48, 256];
 
 /**
  * 序列化为项目 JSON（包含 SVG 内容 + 元数据，便于备份/分享/再导入）。
@@ -60,6 +63,8 @@ const parseProjectFile = async (file) => {
 };
 
 const ExportPanel = ({svgString, name, onImportProject, onImportImage}) => {
+    // 导出格式：png（倍率/自定义尺寸）| ico（多尺寸图标打包）
+    const [format, setFormat] = useState('png');
     // 输入模式：scale = 倍率；custom = 自定义宽高
     const [mode, setMode] = useState('scale');
     const [scale, setScale] = useState(3); // 默认 3x，充分锐利
@@ -67,8 +72,10 @@ const ExportPanel = ({svgString, name, onImportProject, onImportImage}) => {
     const [customH, setCustomH] = useState('');
     const [lockAspect, setLockAspect] = useState(true);
     const [background, setBackground] = useState('');
+    const [icoSizes, setIcoSizes] = useState(ICO_DEFAULT_SIZES);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
+    const [icoInfo, setIcoInfo] = useState(null); // {sizes, bytes}
     const [projectError, setProjectError] = useState(null);
     const [importing, setImporting] = useState(false);
     const [svgImporting, setSvgImporting] = useState(false);
@@ -159,6 +166,39 @@ const ExportPanel = ({svgString, name, onImportProject, onImportImage}) => {
 
     const handleExportSvg = () => {
         downloadSvg(svgString, name || 'export');
+    };
+
+    // ICO 导出：每个勾选尺寸各渲染一张正方形 PNG 画布（内容 meet 居中、透明填充），
+    // 再按微软建议编码打包：≤64px 用 32bpp BMP，≥128px 用 PNG
+    const handleExportIco = async () => {
+        setError(null);
+        setIcoInfo(null);
+        setBusy(true);
+        try {
+            const sizes = [...icoSizes].sort((a, b) => a - b);
+            if (!sizes.length) {
+                throw new Error('请至少勾选一个图标尺寸');
+            }
+            const items = [];
+            for (const size of sizes) {
+                const canvas = await renderSvgCanvas(svgString, {width: size, height: size});
+                items.push({size, canvas});
+            }
+            const blob = await encodeIco(items);
+            downloadIco(blob, `${name || 'export'}.ico`);
+            setIcoInfo({sizes, bytes: blob.size});
+        } catch (e) {
+            setError(e.message || String(e));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const handleIcoSizeToggle = (size) => {
+        setIcoSizes(prev => (prev.includes(size)
+            ? prev.filter(s => s !== size)
+            : [...prev, size]));
+        setIcoInfo(null);
     };
 
     const handleExportProject = () => {
@@ -260,6 +300,7 @@ const ExportPanel = ({svgString, name, onImportProject, onImportImage}) => {
     useEffect(() => {
         setPng(null);
         setError(null);
+        setIcoInfo(null);
     }, [svgString]);
 
     const btn = (label, onClick, disabled) => (
@@ -353,99 +394,172 @@ const ExportPanel = ({svgString, name, onImportProject, onImportImage}) => {
             </div>
 
             <div className={styles.row}>
-                <span className={styles.label}>导出尺寸</span>
+                <span className={styles.label}>导出格式</span>
                 <div className={styles.modeSwitch}>
                     <button
-                        className={mode === 'scale' ? styles.modeOn : styles.modeOff}
-                        onClick={() => setMode('scale')}
+                        className={format === 'png' ? styles.modeOn : styles.modeOff}
+                        onClick={() => setFormat('png')}
                     >
-                        倍率
+                        PNG 图片
                     </button>
                     <button
-                        className={mode === 'custom' ? styles.modeOn : styles.modeOff}
-                        onClick={switchToCustom}
+                        className={format === 'ico' ? styles.modeOn : styles.modeOff}
+                        onClick={() => setFormat('ico')}
                     >
-                        自定义
+                        ICO 图标
                     </button>
                 </div>
-            </div>
-
-            {mode === 'scale' ? (
-                <div className={styles.row}>
-                    <span className={styles.label}>倍率</span>
-                    <div className={styles.presets}>
-                        {SCALE_PRESETS.map(s => (
-                            <button
-                                key={s}
-                                className={scale === s ? styles.presetOn : styles.preset}
-                                onClick={() => setScale(s)}
-                            >
-                                {s}x
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            ) : (
-                <div className={styles.row}>
-                    <span className={styles.label}>宽 / 高</span>
-                    <input
-                        type="number"
-                        min="1"
-                        className={styles.input}
-                        value={customW}
-                        placeholder="宽 px"
-                        onChange={handleWChange}
-                    />
-                    <span className={styles.times}>×</span>
-                    <input
-                        type="number"
-                        min="1"
-                        className={styles.input}
-                        value={customH}
-                        placeholder="高 px"
-                        onChange={handleHChange}
-                    />
-                    <label className={styles.lock}>
-                        <input
-                            type="checkbox"
-                            checked={lockAspect}
-                            onChange={e => setLockAspect(e.target.checked)}
-                        />
-                        锁定纵横比
-                    </label>
-                </div>
-            )}
-
-            <div className={styles.row}>
-                <span className={styles.label}>输出像素</span>
-                <span className={styles.valueHighlight}>
-                    {target ? `${target.width} × ${target.height} px` : '—'}
+                <span className={styles.hint}>
+                    {format === 'ico' ? '多尺寸打包为单个 .ico（Windows 图标 / favicon）' : '任意尺寸的高清位图'}
                 </span>
             </div>
 
-            <div className={styles.row}>
-                <span className={styles.label}>背景</span>
-                <select
-                    className={styles.select}
-                    value={background}
-                    onChange={e => setBackground(e.target.value)}
-                >
-                    {BACKGROUNDS.map(b => (
-                        <option key={b.value} value={b.value}>{b.label}</option>
-                    ))}
-                </select>
-            </div>
+            {format === 'png' && (
+                <React.Fragment>
+                    <div className={styles.row}>
+                        <span className={styles.label}>导出尺寸</span>
+                        <div className={styles.modeSwitch}>
+                            <button
+                                className={mode === 'scale' ? styles.modeOn : styles.modeOff}
+                                onClick={() => setMode('scale')}
+                            >
+                                倍率
+                            </button>
+                            <button
+                                className={mode === 'custom' ? styles.modeOn : styles.modeOff}
+                                onClick={switchToCustom}
+                            >
+                                自定义
+                            </button>
+                        </div>
+                    </div>
+
+                    {mode === 'scale' ? (
+                        <div className={styles.row}>
+                            <span className={styles.label}>倍率</span>
+                            <div className={styles.presets}>
+                                {SCALE_PRESETS.map(s => (
+                                    <button
+                                        key={s}
+                                        className={scale === s ? styles.presetOn : styles.preset}
+                                        onClick={() => setScale(s)}
+                                    >
+                                        {s}x
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className={styles.row}>
+                            <span className={styles.label}>宽 / 高</span>
+                            <input
+                                type="number"
+                                min="1"
+                                className={styles.input}
+                                value={customW}
+                                placeholder="宽 px"
+                                onChange={handleWChange}
+                            />
+                            <span className={styles.times}>×</span>
+                            <input
+                                type="number"
+                                min="1"
+                                className={styles.input}
+                                value={customH}
+                                placeholder="高 px"
+                                onChange={handleHChange}
+                            />
+                            <label className={styles.lock}>
+                                <input
+                                    type="checkbox"
+                                    checked={lockAspect}
+                                    onChange={e => setLockAspect(e.target.checked)}
+                                />
+                                锁定纵横比
+                            </label>
+                        </div>
+                    )}
+
+                    <div className={styles.row}>
+                        <span className={styles.label}>输出像素</span>
+                        <span className={styles.valueHighlight}>
+                            {target ? `${target.width} × ${target.height} px` : '—'}
+                        </span>
+                    </div>
+
+                    <div className={styles.row}>
+                        <span className={styles.label}>背景</span>
+                        <select
+                            className={styles.select}
+                            value={background}
+                            onChange={e => setBackground(e.target.value)}
+                        >
+                            {BACKGROUNDS.map(b => (
+                                <option key={b.value} value={b.value}>{b.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                </React.Fragment>
+            )}
+
+            {format === 'ico' && (
+                <React.Fragment>
+                    <div className={styles.row}>
+                        <span className={styles.label}>图标尺寸</span>
+                        <div className={styles.icoSizes}>
+                            {ICO_SIZES.map(s => {
+                                const on = icoSizes.includes(s);
+                                return (
+                                    <label
+                                        key={s}
+                                        className={on ? `${styles.icoSize} ${styles.icoSizeOn}` : styles.icoSize}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={on}
+                                            onChange={() => handleIcoSizeToggle(s)}
+                                        />
+                                        {s}×{s}
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <div className={styles.row}>
+                        <span className={styles.label}>内容适配</span>
+                        <span className={styles.hint}>
+                            图标为正方形，非方形图形按比例居中、四周透明填充
+                        </span>
+                    </div>
+                </React.Fragment>
+            )}
 
             <div className={styles.row}>
                 <span className={styles.label}>操作</span>
                 <div className={styles.actions}>
-                    {btn('转为 PNG 预览', doRasterize, !svgString)}
-                    {btn('导出 PNG 文件', handleExportPng, !svgString || busy)}
-                    {btn('导出 SVG 文件', handleExportSvg, !svgString)}
+                    {format === 'png' ? (
+                        <React.Fragment>
+                            {btn('转为 PNG 预览', doRasterize, !svgString)}
+                            {btn('导出 PNG 文件', handleExportPng, !svgString || busy)}
+                            {btn('导出 SVG 文件', handleExportSvg, !svgString)}
+                        </React.Fragment>
+                    ) : (
+                        btn(`导出 ICO 文件（${icoSizes.length} 个尺寸）`, handleExportIco, !svgString || busy || !icoSizes.length)
+                    )}
                 </div>
             </div>
 
             {error && <div className={styles.error}>✕ {error}</div>}
+
+            {icoInfo && (
+                <div className={styles.row}>
+                    <span className={styles.label}>ICO 已生成</span>
+                    <span className={styles.valueHighlight}>
+                        {icoInfo.sizes.join(' / ')} px · {(icoInfo.bytes / 1024).toFixed(1)} KB
+                    </span>
+                    <span className={styles.hint}>已开始下载 .ico 文件</span>
+                </div>
+            )}
 
             {png && (
                 <div className={styles.previewBox}>

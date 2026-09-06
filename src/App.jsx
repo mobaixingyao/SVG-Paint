@@ -4,6 +4,7 @@ import {IntlProvider} from 'react-intl';
 
 import PaintEditor from './paint';
 import ExportPanel from './ExportPanel.jsx';
+import ImageToSvgDialog from './ImageToSvgDialog.jsx';
 import paintMessagesMod from 'scratch-l10n/locales/paint-editor-msgs';
 import styles from './app.module.css';
 
@@ -40,7 +41,9 @@ class App extends React.Component {
             'handleTopImportClick',
             'handleTopImportChange',
             'handleTopImageClick',
-            'handleTopImageChange'
+            'handleTopImageChange',
+            'handleToggleImageToSvg',
+            'handleImageToSvgImport'
         ]);
         this.id = 0;
         this.svgFileInput = React.createRef();
@@ -55,7 +58,8 @@ class App extends React.Component {
             imageId: this.id,
             rtl: false,
             svgString: '',
-            showExport: false // 顶部「导入/导出」弹窗
+            showExport: false, // 顶部「导入/导出」弹窗
+            showImageToSvgDialog: false // 「图片转SVG」弹窗
         };
         this.reusableCanvas = document.createElement('canvas');
     }
@@ -111,6 +115,14 @@ class App extends React.Component {
             alert('读取图片失败：' + (err.message || String(err)));
         }
     }
+    handleToggleImageToSvg () {
+        this.setState(prev => ({showImageToSvgDialog: !prev.showImageToSvgDialog}));
+    }
+    handleImageToSvgImport (svg, name) {
+        // 转换结果作为矢量 SVG 导入画布（整体替换），并关闭对话框
+        this.handleImportProject(svg, name);
+        this.setState({showImageToSvgDialog: false});
+    }
     handleImportImage (dataUrl, name) {
         // 触发 PaperCanvas 重新加载：imageId 变化让 componentWillReceiveProps 走 switchCostume
         // imageFormat='image' → 以矢量层 <image> 对象导入，保持矢量模式、居中显示
@@ -130,6 +142,8 @@ class App extends React.Component {
         this.setState({
             svg,
             image: svg,
+            // svgString 是导出面板的数据源，导入后必须同步，否则导出按钮全禁用
+            svgString: svg,
             imageFormat: 'svg',
             imageId: this.id,
             name: name || '造型1',
@@ -160,7 +174,7 @@ class App extends React.Component {
     render () {
         const {
             locale, name, rotationCenterX, rotationCenterY, imageFormat,
-            image, imageId, rtl, svgString, showExport
+            image, imageId, rtl, svgString, showExport, showImageToSvgDialog
         } = this.state;
         const messages = paintMessages[locale] || paintMessages.en || {};
         return (
@@ -208,6 +222,14 @@ class App extends React.Component {
                                 title="导入 PNG / JPG 图片到画布（转为位图）"
                             >
                                 导入图片
+                            </button>
+                            <button
+                                type="button"
+                                className={styles.topBarImport}
+                                onClick={this.handleToggleImageToSvg}
+                                title="将 PNG / JPG 位图描摹为矢量 SVG"
+                            >
+                                图片转SVG
                             </button>
                             <button
                                 type="button"
@@ -272,6 +294,14 @@ class App extends React.Component {
                                 />
                             </div>
                         </div>
+                    ) : null}
+
+                    {/* 图片转 SVG 弹窗 */}
+                    {showImageToSvgDialog ? (
+                        <ImageToSvgDialog
+                            onClose={this.handleToggleImageToSvg}
+                            onImport={this.handleImageToSvgImport}
+                        />
                     ) : null}
                 </div>
             </IntlProvider>

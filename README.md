@@ -6,7 +6,7 @@
 
 <img width="2639" height="1723" alt="image" src="https://github.com/user-attachments/assets/a22ad7a7-1756-4b6c-b50f-3d5660415c05" />
 
-在线体验地址：http://svgpaint.mobaixingyao.dpdns.org/
+在线体验地址：https://svgpaint.mobaixingyao.dpdns.org/
 
 ## 特性
 

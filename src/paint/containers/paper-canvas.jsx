@@ -16,7 +16,9 @@ import {clearRaster, convertBackgroundGuideLayer, getRaster, setupLayers} from '
 import {clearSelectedItems} from '../reducers/selected-items';
 import {
     ART_BOARD_WIDTH, ART_BOARD_HEIGHT, CENTER, MAX_WORKSPACE_BOUNDS,
-    clampViewBounds, resetZoom, setWorkspaceBounds, zoomToFit, resizeCrosshair
+    OUTERMOST_ZOOM_LEVEL,
+    clampViewBounds, resetZoom, setWorkspaceBounds, zoomToFit, resizeCrosshair,
+    zoomOnFixedPoint
 } from '../helper/view';
 import {ensureClockwise, scaleWithStrokes} from '../helper/math';
 import {clearHoveredItem} from '../reducers/hover';
@@ -53,7 +55,13 @@ class PaperCanvas extends React.Component {
             'handlePanPointerUp',
             'handlePanTouchStart',
             'handlePanTouchMove',
-            'handlePanTouchEnd'
+            'handlePanTouchEnd',
+            // 双指捏合缩放
+            'handlePinchPointerDown',
+            'handlePinchPointerMove',
+            'handlePinchPointerUp',
+            'handlePinchTouchStart',
+            'handlePinchTouchMove'
         ]);
     }
     componentDidMount () {
@@ -98,6 +106,9 @@ class PaperCanvas extends React.Component {
         // 保证先于 paper.js（注册在 canvas 上）执行，stopPropagation 即可阻断
         this.panModeActive = false;
         this.panDragging = false;
+        // 双指捏合缩放
+        this.pinchPointers = new Map(); // pointerId -> {x, y}
+        this.pinchActive = false;
         if (this.canvas && this.canvas.parentElement) {
             this.panEventRoot = this.canvas.parentElement;
             this.panEventRoot.addEventListener('pointerdown', this.handlePanPointerDown, true);
@@ -107,6 +118,12 @@ class PaperCanvas extends React.Component {
             this.panEventRoot.addEventListener('touchstart', this.handlePanTouchStart, true);
             this.panEventRoot.addEventListener('touchmove', this.handlePanTouchMove, true);
             this.panEventRoot.addEventListener('touchend', this.handlePanTouchEnd, true);
+            this.panEventRoot.addEventListener('pointerdown', this.handlePinchPointerDown, true);
+            this.panEventRoot.addEventListener('pointermove', this.handlePinchPointerMove, true);
+            this.panEventRoot.addEventListener('pointerup', this.handlePinchPointerUp, true);
+            this.panEventRoot.addEventListener('pointercancel', this.handlePinchPointerUp, true);
+            this.panEventRoot.addEventListener('touchstart', this.handlePinchTouchStart, true);
+            this.panEventRoot.addEventListener('touchmove', this.handlePinchTouchMove, true);
             this.setPanMode(this.props.mode === Modes.PAN);
         }
     }
@@ -153,6 +170,12 @@ class PaperCanvas extends React.Component {
             this.panEventRoot.removeEventListener('touchstart', this.handlePanTouchStart, true);
             this.panEventRoot.removeEventListener('touchmove', this.handlePanTouchMove, true);
             this.panEventRoot.removeEventListener('touchend', this.handlePanTouchEnd, true);
+            this.panEventRoot.removeEventListener('pointerdown', this.handlePinchPointerDown, true);
+            this.panEventRoot.removeEventListener('pointermove', this.handlePinchPointerMove, true);
+            this.panEventRoot.removeEventListener('pointerup', this.handlePinchPointerUp, true);
+            this.panEventRoot.removeEventListener('pointercancel', this.handlePinchPointerUp, true);
+            this.panEventRoot.removeEventListener('touchstart', this.handlePinchTouchStart, true);
+            this.panEventRoot.removeEventListener('touchmove', this.handlePinchTouchMove, true);
         }
         paper.remove();
     }
@@ -279,6 +302,88 @@ class PaperCanvas extends React.Component {
     handlePanTouchEnd (e) {
         if (!this.panModeActive) return;
         e.preventDefault();
+    }
+    // ---- 双指捏合缩放：第二根手指落下时进入手势，吞掉纸面事件并缩放视图 ----
+    handlePinchPointerDown (e) {
+        if (e.__syntheticUp) return; // 我们自己补发的收笔事件不参与手势
+        this.pinchPointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+        if (this.pinchPointers.size === 2 && !this.pinchActive) {
+            // 第二指落下 → 进入捏合：取消抓手拖拽，补发 finger1 的 pointerup
+            // 让 paper 里可能进行中的笔画正常收笔，并记录手势基准
+            this.pinchActive = true;
+            this.panDragging = false;
+            const pts = [...this.pinchPointers.values()];
+            this.pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+            this.pinchStartMid = {x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2};
+            this.pinchStartZoom = paper.view.zoom;
+            this.pinchStartCenter = paper.view.center.clone();
+            const [firstId] = [...this.pinchPointers.keys()];
+            if (firstId !== e.pointerId) {
+                const p = this.pinchPointers.get(firstId);
+                const up = new PointerEvent('pointerup', {
+                    bubbles: true, cancelable: true, isPrimary: true,
+                    pointerId: firstId, clientX: p.x, clientY: p.y, pointerType: 'touch'
+                });
+                up.__syntheticUp = true;
+                if (this.canvas) this.canvas.dispatchEvent(up);
+            }
+        }
+        if (this.pinchActive) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }
+    handlePinchPointerMove (e) {
+        if (!this.pinchActive || !this.pinchPointers.has(e.pointerId)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.pinchPointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+        if (this.pinchPointers.size < 2 || !paper.view) return;
+        const pts = [...this.pinchPointers.values()];
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+        const midX = (pts[0].x + pts[1].x) / 2;
+        const midY = (pts[0].y + pts[1].y) / 2;
+        // 1) 中点位移 → 平移
+        const midDx = midX - this.pinchStartMid.x;
+        const midDy = midY - this.pinchStartMid.y;
+        paper.view.center = this.pinchStartCenter.add(
+            new paper.Point(midDx, midDy).divide(this.pinchStartZoom)
+        );
+        // 2) 距离比例 → 围绕中点缩放（夹在最低/最高缩放之间）
+        const targetZoom = Math.max(
+            OUTERMOST_ZOOM_LEVEL,
+            Math.min(8, this.pinchStartZoom * (dist / this.pinchStartDist))
+        );
+        const midProject = paper.view.viewToProject(new paper.Point(midX, midY));
+        zoomOnFixedPoint(targetZoom - paper.view.zoom, midProject);
+    }
+    handlePinchPointerUp (e) {
+        if (e.__syntheticUp || !this.pinchPointers.has(e.pointerId)) return;
+        this.pinchPointers.delete(e.pointerId);
+        if (!this.pinchActive) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (this.pinchPointers.size >= 2) {
+            // 捏合中抬起一指后仍有两指 → 以剩余两指重建手势基准
+            const pts = [...this.pinchPointers.values()];
+            this.pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+            this.pinchStartMid = {x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2};
+            this.pinchStartZoom = paper.view.zoom;
+            this.pinchStartCenter = paper.view.center.clone();
+        } else if (this.pinchPointers.size === 0) {
+            this.pinchActive = false; // 全部抬起才交还事件给纸面
+        }
+    }
+    handlePinchTouchStart (e) {
+        // 捏合中阻断 legacy touch 流，防止 paper 工具/浏览器滚动接管
+        if (!this.pinchActive) return;
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    handlePinchTouchMove (e) {
+        if (!this.pinchActive) return;
+        e.preventDefault();
+        e.stopPropagation();
     }
     clearQueuedImport () {
         if (this.queuedImport) {
